@@ -22,7 +22,7 @@ def get_embeddings(corpus_path, model_name= 'sentence-transformers/all-MiniLM-L6
     except Exception as e:
         raise ValueError(f"An error occurred while getting embeddings: {e}")
 
-def load_embeddings(file_path='embeddings.json'):
+def load_embeddings(file_path='embeddings.json') -> pd.DataFrame:
     try:
         with open(file_path, 'r') as f:
             embeddings_dict = json.load(f)
