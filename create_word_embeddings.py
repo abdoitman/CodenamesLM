@@ -13,7 +13,7 @@ raw_vocab = {w.lower() for w in words.words() if w.isalpha()}
 wordnet_vocab = set(wordnet.words())
 modern_vocab = raw_vocab & wordnet_vocab
 
-filtered_vocab = {w for w in modern_vocab if word_frequency(w, 'en') > 1e-5}
+filtered_vocab = {w for w in modern_vocab if word_frequency(w, 'en') > 1e-6}
 
 function_words = {"a", "i", "the", "an", "of", "in", "on", "to", "at", "and", "or"}
 final_vocab = filtered_vocab | codenames_corpus - function_words
