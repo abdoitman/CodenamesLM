@@ -5,8 +5,9 @@ import pandas as pd
 import faiss
 from sentence_transformers import SentenceTransformer
 
-codenames_corpus = pd.read_csv('corpus.csv').values.tolist()
-codenames_corpus = set(codenames_corpus)
+codenames_corpus = pd.read_csv('corpus.csv').values.flatten().tolist()
+codenames_corpus = set([word.lower() for word in codenames_corpus])
+
 raw_vocab = {w.lower() for w in words.words() if w.isalpha()}
 
 wordnet_vocab = set(wordnet.words())
