@@ -1,20 +1,20 @@
 import pandas as pd
 import numpy as np
-from get_embeddings import load_embeddings
 from sentence_transformers import SentenceTransformer
 import random
 import faiss
 
 class GameBoard:
     def __init__(self, game_vocab: pd.DataFrame):
-        self.word_list = game_vocab.index.to_list()
-        self.words_grid = game_vocab.index.to_numpy().reshape(5, 5)
+        self.word_list = game_vocab.values.flatten().tolist()
+        self.words_grid = game_vocab.to_numpy().reshape(5, 5)
         self.playable_cells = np.ones((5,5))
 
 class Player:
-    def __init__(self, team: str, model):
+    def __init__(self, team: str, model, index: faiss.IndexFlatIP):
         self.team = team
         self.LM = model
+        self.index = index 
 
 class Spymaster(Player):
     def __init__(self, key_card: dict, kwargs):
@@ -38,7 +38,7 @@ class FieldOperative(Player):
 class CodenameGame:
     def __init__(self):
         self.score = {'red' : 0, 'blue': 0}
-        self.__corpus = load_embeddings()
+        self.__corpus = pd.read_csv('corpus.csv')
         self.__game_vocab = self.__corpus.sample(25)
         self.game_board = GameBoard(self.__game_vocab)
         self.is_game_over = False
@@ -60,10 +60,6 @@ class CodenameGame:
    
     def get_word_list(self):
         return self.__words_list
-
-    def get_word_embedding(self, word: str):
-        assert isinstance(word, str) , 'word must be string'
-        return self.__game_vocab.loc[word, :]
 
     def set_score(self, team: str):
         self.score[team] += 1
@@ -90,7 +86,7 @@ class CodenameGame:
 
 if __name__ == '__main__':
     # LMmodel = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-    index = faiss.read_index("word_embeddings.index")
-    id_to_word = np.load("id_to_word.npy", allow_pickle=True).item()
+    # index = faiss.read_index("word_embeddings.index")
+    # id_to_word = np.load("id_to_word.npy", allow_pickle=True).item()
     cn = CodenameGame()
-    print(cn.key_card)
+    print(cn.game_board.words_grid)
