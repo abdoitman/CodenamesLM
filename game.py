@@ -3,6 +3,7 @@ import numpy as np
 from get_embeddings import load_embeddings
 from sentence_transformers import SentenceTransformer
 import random
+import faiss
 
 class GameBoard:
     def __init__(self, game_vocab: pd.DataFrame):
@@ -89,5 +90,7 @@ class CodenameGame:
 
 if __name__ == '__main__':
     # LMmodel = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+    index = faiss.read_index("word_embeddings.index")
+    id_to_word = np.load("id_to_word.npy", allow_pickle=True).item()
     cn = CodenameGame()
     print(cn.key_card)
