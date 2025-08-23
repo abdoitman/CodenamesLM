@@ -8,8 +8,8 @@ from itertools import cycle
 class GameBoard:
     def __init__(self, game_vocab: pd.DataFrame):
         self.word_list = game_vocab.values.flatten().tolist()
-        self.playable_cells = dict(zip(self.word_list, [1] * 25))
-        self.words_grid = game_vocab.to_numpy().reshape(5, 5)
+        self.playable_cards = dict(zip(self.word_list, [1] * 25))
+        self.words_grid = self.word_list.to_numpy().reshape(5, 5)
         
 class CodenameGame:
     def __init__(self):
@@ -44,8 +44,12 @@ class CodenameGame:
     def set_score(self, team: str):
         self.score[team] += 1
 
+    def disable_card(self, word: str):
+        self.game_board.playable_cards[word] = 0
+
     def evaluate_guess(self, guess: str, team: str):
         color = self.key_card[guess]
+        
         if color == 'white': 
             print(f"{team.title()} field operative guessed '{guess}' which is a civilian (white card)")
         elif color == 'black':
@@ -58,6 +62,8 @@ class CodenameGame:
         else:
             print(f"{team.title()} field operative guessed '{guess}' which is not correct ({color} agent)")
             self.set_score(color)
+        
+        self.disable_card(guess)
         return color
     
     def check_score(self):
@@ -66,9 +72,9 @@ class CodenameGame:
         else: return
         self.is_game_over = True
         print(f"Blue team scored {self.score['blue']} points")
-        print(f'Red team scored {self.score['red']} points')
+        print(f"Red team scored {self.score['red']} points")
 
-    def play(self, blue_team: tuple[Spymaster, FieldOperative], red_team: tuple[Spymaster, FieldOperative], render: bool = False):
+    def play(self, blue_team: tuple, red_team: tuple, render: bool = False):
         print(f'Team {self.starting_team} is starting...')
         if self.starting_team == 'red' : take_turns = cycle([('red', red_team), ('blue', blue_team)])
         else: take_turns = cycle([('blue', blue_team), ('red', red_team)])
@@ -79,12 +85,9 @@ class CodenameGame:
                 clue, num_of_words = spymaster.give_clue()
                 print(f"{team.title()} spymaster's clue : {clue} for {num_of_words} cards")
                 guesses = field_operative.guess(clue= clue, num_of_words= num_of_words)
-                if num_of_words > 1:
-                    for guess in guesses:
-                        color = self.evaluate_guess(guess, team)
-                        if color != team: break
-                else:
-                    color = self.evaluate_guess(guesses, team)
+                for guess in guesses:
+                    color = self.evaluate_guess(guess, team)
+                    if color != team: break
 
                 print(f"{team.title()} turn's ended.")
                 if not self.is_game_over: self.check_score() # This won't be the case if some player chose the assassin word
@@ -106,10 +109,24 @@ class Spymaster(Player):
         self.__key_card = self.game.key_card
 
     def give_clue(self) -> tuple[str, int]:
-        pass
+        playable_words_list = [k for k, v in self.gameboard.playable_cards.items() if v == 1]
+        allie_cards = [k for k, v in self.__key_card.items() if (v == self.team) and (k in playable_words_list)]
+        white_cards = [k for k, v in self.__key_card.items() if (v == 'white') and (k in playable_words_list)]
+        black_cards = [k for k, v in self.__key_card.items() if (v == 'black') and (k in playable_words_list)]
+        enemy_cards = [k for k, v in self.__key_card.items() if k not in allie_cards + white_cards + black_cards]
 
-    def update_key_card(self):
-        pass
+        allie_cards_embeddings = self.model.encode(allie_cards, convert_to_numpy= True).astype("float32")
+        enemy_cards_embeddings = self.model.encode(enemy_cards, convert_to_numpy= True).astype("float32")
+        white_cards_embeddings = self.model.encode(white_cards, convert_to_numpy= True).astype("float32")
+        black_cards_embeddings = self.model.encode(black_cards, convert_to_numpy= True).astype("float32")
+
+        ### Here comes the lovely logic
+
+
+        clue = ''
+        num_of_words = 0
+        return (clue, num_of_words)
+
     
 class FieldOperative(Player):
     def __init__(self, **kwargs):
@@ -121,8 +138,22 @@ class FieldOperative(Player):
         self.cards_index.add(cards_embeddings)
         self.id_to_word = {i: w for i, w in enumerate(self.cards)}
     
-    def guess(self, clue: str, num_of_words: int) -> str | list:
-        score, index = self.cards_index.search(clue, k = 10)
+    def guess(self, clue: str, num_of_words: int) -> list:
+        score, words = self.cards_index.search(clue, k = 10)
+        non_playable_words_list = [k for k, v in self.gameboard.playable_cards.items() if v == 0]
+        scores = score[0]
+        indices = words[0]
+        sorted_idx = np.argsort(scores)[::-1]
+
+        guesses = []
+        for idx in sorted_idx:
+            word = self.id_to_word[indices[idx]]
+            if word not in non_playable_words_list:
+                guesses.append(word)
+            if len(guesses) == num_of_words:
+                break
+        
+        return guesses
 
 
 
