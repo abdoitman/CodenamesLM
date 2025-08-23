@@ -3,6 +3,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 import random
 import faiss
+from itertools import cycle
 
 class GameBoard:
     def __init__(self, game_vocab: pd.DataFrame):
@@ -32,7 +33,7 @@ class FieldOperative(Player):
         super.__init__(self, **kwargs)
         self.cards = cards
     
-    def guess(self, clue: str) -> str | list:
+    def guess(self, clue: str, num_of_words: int) -> str | list:
         pass
 
 class CodenameGame:
@@ -57,6 +58,10 @@ class CodenameGame:
         ]
         game_assignment, self.starting_team = random.choice(assignments)
         self.key_card = dict(zip(self.__words_list, game_assignment))
+        self.__words_count = {
+            'blue' : game_assignment.count('blue'),
+            'red' : game_assignment.count('red')
+        }
    
     def get_word_list(self):
         return self.__words_list
@@ -66,20 +71,35 @@ class CodenameGame:
 
     def evaluate_word(self, word: str, team: str):
         color = self.key_card[word]
-        if color == 'white':
-            self.is_turn_over = True
-        elif color == 'black':
+        if color == 'black':
             self.is_game_over = True
             print(f"Team {team} Lost!")
         elif color == team:
             self.set_score(team)
         else:
             self.score(color)
-            self.is_turn_over = True
+        
+        return color
 
     def play(self, blue_team: tuple[Spymaster, FieldOperative], red_team: tuple[Spymaster, FieldOperative]):
         print(f'Team {self.starting_team} is starting...')
-        return self.is_game_over, ...
+        if self.starting_team == 'red' : take_turns = cycle([('red', red_team), ('blue', blue_team)])
+        else: take_turns = cycle([('blue', blue_team), ('red', red_team)])
+        while not self.is_game_over:
+            for team, (spymaster, field_operative) in take_turns:
+                clue, num_of_words = spymaster.give_clue()
+                guesses = field_operative.guess(clue= clue, num_of_words= num_of_words)
+                if num_of_words > 1:
+                    for guess in guesses:
+                        color = self.evaluate_word(guess, team)
+                        if color != team: continue
+            
+            if self.score[team] == self.__words_count[team]:
+                self.is_game_over = True
+
+        if self.score['red'] > self.score['blue']:
+            print()
+        print()
 
     def render(self):
         pass
