@@ -69,8 +69,8 @@ class CodenameGame:
     def set_score(self, team: str):
         self.score[team] += 1
 
-    def evaluate_word(self, word: str, team: str):
-        color = self.key_card[word]
+    def evaluate_guess(self, guess: str, team: str):
+        color = self.key_card[guess]
         if color == 'black':
             self.is_game_over = True
             print(f"Team {team} Lost!")
@@ -80,6 +80,14 @@ class CodenameGame:
             self.score(color)
         
         return color
+    
+    def check_score(self):
+        if self.score['red'] == self.__words_count['red']: print('RED TEM WON !!')
+        elif self.score['blue'] == self.__words_count['blue']: print('RED TEM WON !!')
+        else: return
+        self.is_game_over = True
+        print(f"Blue team: {self.score['blue']} points")
+        print(f'Red team: {self.score['red']} points')
 
     def play(self, blue_team: tuple[Spymaster, FieldOperative], red_team: tuple[Spymaster, FieldOperative]):
         print(f'Team {self.starting_team} is starting...')
@@ -91,11 +99,9 @@ class CodenameGame:
                 guesses = field_operative.guess(clue= clue, num_of_words= num_of_words)
                 if num_of_words > 1:
                     for guess in guesses:
-                        color = self.evaluate_word(guess, team)
-                        if color != team: continue
-            
-            if self.score[team] == self.__words_count[team]:
-                self.is_game_over = True
+                        color = self.evaluate_guess(guess, team)
+                        if color != team: break
+                if not self.is_game_over: self.check_score() # This won't be the case if some player chose the assassin word. 
 
         if self.score['red'] > self.score['blue']:
             print()
