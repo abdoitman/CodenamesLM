@@ -71,14 +71,12 @@ class CodenameGame:
 
     def evaluate_guess(self, guess: str, team: str):
         color = self.key_card[guess]
-        if color == 'black':
+        if color == 'white': pass
+        elif color == 'black':
             self.is_game_over = True
             print(f"Team {team} Lost!")
-        elif color == team:
-            self.set_score(team)
-        else:
-            self.score(color)
-        
+        elif color == team: self.set_score(team)
+        else: self.set_score(color)
         return color
     
     def check_score(self):
@@ -101,11 +99,7 @@ class CodenameGame:
                     for guess in guesses:
                         color = self.evaluate_guess(guess, team)
                         if color != team: break
-                if not self.is_game_over: self.check_score() # This won't be the case if some player chose the assassin word. 
-
-        if self.score['red'] > self.score['blue']:
-            print()
-        print()
+                if not self.is_game_over: self.check_score() # This won't be the case if some player chose the assassin word
 
     def render(self):
         pass
