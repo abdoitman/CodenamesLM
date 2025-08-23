@@ -20,13 +20,13 @@ if __name__ == '__main__':
                              model= LMmodel,
                              index= index)
     red_SM = Spymaster(game= game,
-                        team= 'red',
-                        model= LMmodel,
-                        index= index)
+                       team= 'red',
+                       model= LMmodel,
+                       index= index)
     red_FO = FieldOperative(game= game,
-                             team= 'red',
-                             model= LMmodel,
-                             index= index)
+                            team= 'red',
+                            model= LMmodel,
+                            index= index)
     
     game.play(
         blue_team= (blue_SM, blue_FO),
