@@ -8,34 +8,9 @@ from itertools import cycle
 class GameBoard:
     def __init__(self, game_vocab: pd.DataFrame):
         self.word_list = game_vocab.values.flatten().tolist()
+        self.playable_cells = dict(zip(self.word_list, [1] * 25))
         self.words_grid = game_vocab.to_numpy().reshape(5, 5)
-        self.playable_cells = np.ones((5,5))
-
-class Player:
-    def __init__(self, team: str, model, index: faiss.IndexFlatIP):
-        self.team = team
-        self.LM = model
-        self.index = index 
-
-class Spymaster(Player):
-    def __init__(self, key_card: dict, kwargs):
-        super.__init__(self, **kwargs)
-        self.__key_card = key_card
-
-    def give_clue(self) -> tuple[str, int]:
-        pass
-
-    def update_key_card(self):
-        pass
-    
-class FieldOperative(Player):
-    def __init__(self, cards: list, **kwargs):
-        super.__init__(self, **kwargs)
-        self.cards = cards
-    
-    def guess(self, clue: str, num_of_words: int) -> str | list:
-        pass
-
+        
 class CodenameGame:
     def __init__(self):
         self.score = {'red' : 0, 'blue': 0}
@@ -63,7 +38,7 @@ class CodenameGame:
             'red' : game_assignment.count('red')
         }
    
-    def get_word_list(self):
+    def get_words_list(self):
         return self.__words_list
 
     def set_score(self, team: str):
@@ -71,21 +46,27 @@ class CodenameGame:
 
     def evaluate_guess(self, guess: str, team: str):
         color = self.key_card[guess]
-        if color == 'white': pass
+        if color == 'white': 
+            print(f"{team.title()} field operative guessed '{guess}' which is a civilian (white card)")
         elif color == 'black':
             self.is_game_over = True
-            print(f"Team {team} Lost!")
-        elif color == team: self.set_score(team)
-        else: self.set_score(color)
+            print(f"{team.title()} field operative guessed '{guess}' which is the assassin (black card)")
+            print(f"TEAM {team.capitalize()} LOST!!")
+        elif color == team:
+            print(f"{team.title()} field operative guessed '{guess}' which is correct ({team} agent)")
+            self.set_score(team)
+        else:
+            print(f"{team.title()} field operative guessed '{guess}' which is not correct ({color} agent)")
+            self.set_score(color)
         return color
     
     def check_score(self):
         if self.score['red'] == self.__words_count['red']: print('RED TEM WON !!')
-        elif self.score['blue'] == self.__words_count['blue']: print('RED TEM WON !!')
+        elif self.score['blue'] == self.__words_count['blue']: print('BLUE TEM WON !!')
         else: return
         self.is_game_over = True
-        print(f"Blue team: {self.score['blue']} points")
-        print(f'Red team: {self.score['red']} points')
+        print(f"Blue team scored {self.score['blue']} points")
+        print(f'Red team scored {self.score['red']} points')
 
     def play(self, blue_team: tuple[Spymaster, FieldOperative], red_team: tuple[Spymaster, FieldOperative], render: bool = False):
         print(f'Team {self.starting_team} is starting...')
@@ -93,16 +74,57 @@ class CodenameGame:
         else: take_turns = cycle([('blue', blue_team), ('red', red_team)])
         while not self.is_game_over:
             for team, (spymaster, field_operative) in take_turns:
+                print(f"{team.title()} turn's started.")
+
                 clue, num_of_words = spymaster.give_clue()
+                print(f"{team.title()} spymaster's clue : {clue} for {num_of_words} cards")
                 guesses = field_operative.guess(clue= clue, num_of_words= num_of_words)
                 if num_of_words > 1:
                     for guess in guesses:
                         color = self.evaluate_guess(guess, team)
                         if color != team: break
+                else:
+                    color = self.evaluate_guess(guesses, team)
+
+                print(f"{team.title()} turn's ended.")
                 if not self.is_game_over: self.check_score() # This won't be the case if some player chose the assassin word
 
     def render(self):
         pass
+
+class Player:
+    def __init__(self, team: str, model, index: faiss.IndexFlatIP, game: CodenameGame):
+        self.team = team
+        self.LM = model
+        self.corpus_index = index
+        self.game = game
+        self.gameboard = game.game_board
+
+class Spymaster(Player):
+    def __init__(self, kwargs):
+        super.__init__(self, **kwargs)
+        self.__key_card = self.game.key_card
+
+    def give_clue(self) -> tuple[str, int]:
+        pass
+
+    def update_key_card(self):
+        pass
+    
+class FieldOperative(Player):
+    def __init__(self, **kwargs):
+        super.__init__(self, **kwargs)
+        self.cards = self.game.get_words_list()
+        cards_embeddings = self.LM.encode(self.cards, convert_to_numpy=True).astype("float32")
+        dim = cards_embeddings.shape[1]
+        self.cards_index = faiss.IndexFlatIP(dim)
+        self.cards_index.add(cards_embeddings)
+        self.id_to_word = {i: w for i, w in enumerate(self.cards)}
+    
+    def guess(self, clue: str, num_of_words: int) -> str | list:
+        score, index = self.cards_index.search(clue, k = 10)
+
+
 
 if __name__ == '__main__':
     # LMmodel = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
