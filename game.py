@@ -87,7 +87,7 @@ class CodenameGame:
         print(f"Blue team: {self.score['blue']} points")
         print(f'Red team: {self.score['red']} points')
 
-    def play(self, blue_team: tuple[Spymaster, FieldOperative], red_team: tuple[Spymaster, FieldOperative]):
+    def play(self, blue_team: tuple[Spymaster, FieldOperative], red_team: tuple[Spymaster, FieldOperative], render: bool = False):
         print(f'Team {self.starting_team} is starting...')
         if self.starting_team == 'red' : take_turns = cycle([('red', red_team), ('blue', blue_team)])
         else: take_turns = cycle([('blue', blue_team), ('red', red_team)])
