@@ -4,12 +4,13 @@ from sentence_transformers import SentenceTransformer
 import random
 import faiss
 from itertools import cycle
+from nltk.stem import PorterStemmer
 
 class GameBoard:
     def __init__(self, game_vocab: pd.DataFrame):
         self.word_list = game_vocab.values.flatten().tolist()
         self.playable_cards = dict(zip(self.word_list, [1] * 25))
-        self.words_grid = self.word_list.to_numpy().reshape(5, 5)
+        self.words_grid = game_vocab.to_numpy().reshape(5, 5)
         
 class CodenameGame:
     def __init__(self):
@@ -75,10 +76,10 @@ class CodenameGame:
         print(f"Red team scored {self.score['red']} points")
 
     def play(self, blue_team: tuple, red_team: tuple, render: bool = False):
-        print(f'Team {self.starting_team} is starting...')
         if self.starting_team == 'red' : take_turns = cycle([('red', red_team), ('blue', blue_team)])
         else: take_turns = cycle([('blue', blue_team), ('red', red_team)])
         while not self.is_game_over:
+            if render: self.render()
             for team, (spymaster, field_operative) in take_turns:
                 print(f"{team.title()} turn's started.")
 
@@ -91,12 +92,16 @@ class CodenameGame:
 
                 print(f"{team.title()} turn's ended.")
                 if not self.is_game_over: self.check_score() # This won't be the case if some player chose the assassin word
+        if render: self.close()
 
     def render(self):
         pass
 
+    def close(self):
+        pass
+
 class Player:
-    def __init__(self, team: str, model, index: faiss.IndexFlatIP, game: CodenameGame):
+    def __init__(self, game: CodenameGame, team: str, model, index: faiss.IndexFlatIP):
         self.team = team
         self.LM = model
         self.corpus_index = index
@@ -104,24 +109,27 @@ class Player:
         self.gameboard = game.game_board
 
 class Spymaster(Player):
-    def __init__(self, kwargs):
-        super.__init__(self, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.__key_card = self.game.key_card
+        self.__stemmer = PorterStemmer()
 
     def give_clue(self) -> tuple[str, int]:
+        ## Note that we can't give a clue that is derived from a word on the board
+        ## Use a stemmer to remove these kinds of words
         playable_words_list = [k for k, v in self.gameboard.playable_cards.items() if v == 1]
+        playable_words_roots_list = [self.__stemmer.stem(word) for word in playable_words_list]
         allie_cards = [k for k, v in self.__key_card.items() if (v == self.team) and (k in playable_words_list)]
         white_cards = [k for k, v in self.__key_card.items() if (v == 'white') and (k in playable_words_list)]
         black_cards = [k for k, v in self.__key_card.items() if (v == 'black') and (k in playable_words_list)]
         enemy_cards = [k for k, v in self.__key_card.items() if k not in allie_cards + white_cards + black_cards]
 
-        allie_cards_embeddings = self.model.encode(allie_cards, convert_to_numpy= True).astype("float32")
-        enemy_cards_embeddings = self.model.encode(enemy_cards, convert_to_numpy= True).astype("float32")
-        white_cards_embeddings = self.model.encode(white_cards, convert_to_numpy= True).astype("float32")
-        black_cards_embeddings = self.model.encode(black_cards, convert_to_numpy= True).astype("float32")
+        allie_cards_embeddings = self.LM.encode(allie_cards, convert_to_numpy= True).astype("float32")
+        enemy_cards_embeddings = self.LM.encode(enemy_cards, convert_to_numpy= True).astype("float32")
+        white_cards_embeddings = self.LM.encode(white_cards, convert_to_numpy= True).astype("float32")
+        black_cards_embeddings = self.LM.encode(black_cards, convert_to_numpy= True).astype("float32")
 
         ### Here comes the lovely logic
-
 
         clue = ''
         num_of_words = 0
@@ -130,7 +138,7 @@ class Spymaster(Player):
     
 class FieldOperative(Player):
     def __init__(self, **kwargs):
-        super.__init__(self, **kwargs)
+        super().__init__(**kwargs)
         self.cards = self.game.get_words_list()
         cards_embeddings = self.LM.encode(self.cards, convert_to_numpy=True).astype("float32")
         dim = cards_embeddings.shape[1]
@@ -140,7 +148,7 @@ class FieldOperative(Player):
     
     def guess(self, clue: str, num_of_words: int) -> list:
         score, words = self.cards_index.search(clue, k = 10)
-        non_playable_words_list = [k for k, v in self.gameboard.playable_cards.items() if v == 0]
+        playable_words_list = [k for k, v in self.gameboard.playable_cards.items() if v == 1]
         scores = score[0]
         indices = words[0]
         sorted_idx = np.argsort(scores)[::-1]
@@ -148,14 +156,12 @@ class FieldOperative(Player):
         guesses = []
         for idx in sorted_idx:
             word = self.id_to_word[indices[idx]]
-            if word not in non_playable_words_list:
+            if word in playable_words_list:
                 guesses.append(word)
             if len(guesses) == num_of_words:
                 break
         
         return guesses
-
-
 
 if __name__ == '__main__':
     # LMmodel = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
