@@ -101,7 +101,7 @@ class CodenameGame:
         pass
 
 class Player:
-    def __init__(self, game: CodenameGame, team: str, model, index: faiss.IndexFlatIP):
+    def __init__(self, game: CodenameGame, team: str, model, index: faiss.IndexFlatIP | faiss.IndexFlatL2):
         self.team = team
         self.LM = model
         self.corpus_index = index
