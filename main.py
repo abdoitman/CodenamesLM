@@ -10,23 +10,21 @@ if __name__ == '__main__':
     id_to_word = np.load("id_to_word.npy", allow_pickle=True).item()
     
     game = CodenameGame()
-    key_card = game.key_card
-    cards = game.get_word_list()
 
-    blue_SM = Spymaster(key_card= key_card,
-                        team = 'blue',
+    blue_SM = Spymaster(game= game,
+                        team= 'blue',
                         model= LMmodel,
                         index= index)
-    blue_FO = FieldOperative(cards= cards,
-                             team = 'blue',
+    blue_FO = FieldOperative(game= game,
+                             team= 'blue',
                              model= LMmodel,
                              index= index)
-    red_SM = Spymaster(key_card= key_card,
-                        team = 'red',
+    red_SM = Spymaster(game= game,
+                        team= 'red',
                         model= LMmodel,
                         index= index)
-    red_FO = FieldOperative(cards= cards,
-                             team = 'red',
+    red_FO = FieldOperative(game= game,
+                             team= 'red',
                              model= LMmodel,
                              index= index)
     
