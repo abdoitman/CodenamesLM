@@ -16,16 +16,19 @@ if __name__ == '__main__':
                         model= LMmodel,
                         index= index,
                         id_to_word= id_to_word)
+    
     blue_FO = FieldOperative(game= game,
                              team= 'blue',
                              model= LMmodel,
                              index= index,
                              id_to_word= id_to_word)
+    
     red_SM = Spymaster(game= game,
                        team= 'red',
                        model= LMmodel,
                        index= index,
                        id_to_word= id_to_word)
+    
     red_FO = FieldOperative(game= game,
                             team= 'red',
                             model= LMmodel,
