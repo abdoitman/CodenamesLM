@@ -132,10 +132,10 @@ class CodenameGame:
         }
         reset = '\033[0m'
         print("Welcome to Codenames!")
-        print(f"Blue agents are : {', '.join([k for k, v in self.key_card.items() if v == 'blue'])}")
-        print(f"Red agents are : {', '.join([k for k, v in self.key_card.items() if v == 'red'])}")
-        print(f"Civilian words are : {', '.join([k for k, v in self.key_card.items() if v == 'white'])}")
-        print(f"Assassin word is : {', '.join([k for k, v in self.key_card.items() if v == 'black'])}\n")
+        print(f"{color_map.get('blue', reset)}{'BLUE'}{reset} agents are : {', '.join([k for k, v in self.key_card.items() if v == 'blue'])}")
+        print(f"{color_map.get('red', reset)}{'RED'}{reset} agents are : {', '.join([k for k, v in self.key_card.items() if v == 'red'])}")
+        print(f"{color_map.get('white', reset)}{'CIVILIAN'}{reset} words are : {', '.join([k for k, v in self.key_card.items() if v == 'white'])}")
+        print(f"{color_map.get('black', reset)}{'ASSASSIN'}{reset} word is : {', '.join([k for k, v in self.key_card.items() if v == 'black'])}\n")
         if self.starting_team == 'red' : take_turns = cycle([('red', red_team), ('blue', blue_team)])
         else: take_turns = cycle([('blue', blue_team), ('red', red_team)])
         while not self.is_game_over:
