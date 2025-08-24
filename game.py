@@ -86,35 +86,51 @@ class CodenameGame:
         reset = '\033[0m'
         color = self.key_card[guess]
         colored_guess = f"{color_map.get(color, reset)}{guess}{reset}"
+        colored_team = f"{color_map.get(team, reset)}{team.upper()}{reset}"
 
         if color == 'white':
-            print(f"{team.title()} field operative guessed {colored_guess} which is a civilian")
+            print(f"{colored_team} field operative guessed {colored_guess} which is a civilian")
         elif color == 'black':
             self.is_game_over = True
-            print(f"{team.title()} field operative guessed {colored_guess} which is the assassin")
-            print(f"TEAM {color_map.get(team, reset)}{team.capitalize()}{reset} LOST!!")
+            print(f"{colored_team} field operative guessed {colored_guess} which is the assassin")
+            print(f"TEAM {colored_team} LOST!!")
         elif color == team:
-            print(f"{team.title()} field operative guessed {colored_guess} which is correct")
+            print(f"{colored_team} field operative guessed {colored_guess} which is correct")
             self.set_score(team)
         else:
-            print(f"{team.title()} field operative guessed {colored_guess} which is not correct")
+            print(f"{colored_team} field operative guessed {colored_guess} which is not correct")
             self.set_score(color)
 
         self.disable_card(guess)
         return color
 
     def print_score(self):
-        print(f"Blue team : {self.score['blue']} points | Red team : {self.score['red']} points")
+        color_map = {
+            'red': '\033[91m',
+            'blue': '\033[94m'
+        }
+        reset = '\033[0m'
+        print(f"SCORE: {color_map.get('blue', reset)}{self.score['blue']}{reset} | {color_map.get('red', reset)}{self.score['red']}{reset}")
 
     def check_score(self):
-        if self.score['red'] == self.__words_count['red']: print('RED TEM WON !!')
-        elif self.score['blue'] == self.__words_count['blue']: print('BLUE TEM WON !!')
+        color_map = {
+            'red': '\033[91m',
+            'blue': '\033[94m'
+        }
+        reset = '\033[0m'
+        if self.score['red'] == self.__words_count['red']: print(f"{color_map.get('red', reset)}{'RED'}{reset} TEAM WON !!")
+        elif self.score['blue'] == self.__words_count['blue']: print(f"{color_map.get('blue', reset)}{'BLUE'}{reset} TEM WON !!")
         else: return
         self.is_game_over = True
-        print(f"Blue team scored {self.score['blue']} points")
-        print(f"Red team scored {self.score['red']} points")
 
     def play(self, blue_team: tuple, red_team: tuple, render: bool = False):
+        color_map = {
+            'red': '\033[91m',
+            'blue': '\033[94m',
+            'white': '\033[97m',
+            'black': '\033[90m',
+        }
+        reset = '\033[0m'
         print("Welcome to Codenames!")
         print(f"Blue agents are : {', '.join([k for k, v in self.key_card.items() if v == 'blue'])}")
         print(f"Red agents are : {', '.join([k for k, v in self.key_card.items() if v == 'red'])}")
@@ -125,21 +141,22 @@ class CodenameGame:
         while not self.is_game_over:
             if render: self.render()
             for team, (spymaster, field_operative) in take_turns:
-                print(f"{team.title()} turn's started.")
+                colored_team = f"{color_map.get(team, reset)}{team.upper()}{reset}"
+                print(f"{colored_team} turn's started.")
                 print("Current Board:")
                 self.game_board.print_grid()
                 self.print_score()
                 clue, num_of_words = spymaster.give_clue()
-                print(f"{team.title()} spymaster's clue : {clue} for {num_of_words} card(s)")
+                print(f"{colored_team} spymaster's clue : {clue} for {num_of_words} card(s)")
                 guesses = field_operative.guess(clue= clue, num_of_words= num_of_words)
                 for guess in guesses:
                     color = self.evaluate_guess(guess, team)
                     if color != team: break
                 
                 self.check_score()
-                sleep(3)
+                sleep(5)
                 if self.is_game_over: break
-                else: print(f"{team.title()} turn's ended.\n")
+                else: print(f"{colored_team} turn's ended.\n")
         if render: self.close()
 
     def render(self):
