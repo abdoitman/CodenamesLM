@@ -39,7 +39,14 @@ class CodenameGame:
             'blue' : game_assignment.count('blue'),
             'red' : game_assignment.count('red')
         }
-   
+        # encode the 25 words on the board
+        LM = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+        board_embeddings = LM.encode(self.__words_list, convert_to_numpy= True).astype("float32")
+        dim = board_embeddings.shape[1]
+        self.board_index = faiss.IndexFlatIP(dim)
+        self.board_index.add(board_embeddings)
+        self.id_to_word_board = {i: w for i, w in enumerate(self.__words_list)}
+
     def get_words_list(self):
         return self.__words_list
 
@@ -67,11 +74,16 @@ class CodenameGame:
         
         self.disable_card(guess)
         return color
-    
+
+    def print_score(self):
+        print(f"Blue team : {self.score['blue']} points | Red team : {self.score['red']} points")
+
     def check_score(self):
         if self.score['red'] == self.__words_count['red']: print('RED TEM WON !!')
         elif self.score['blue'] == self.__words_count['blue']: print('BLUE TEM WON !!')
-        else: return
+        else:
+            self.print_score()
+            return
         self.is_game_over = True
         print(f"Blue team scored {self.score['blue']} points")
         print(f"Red team scored {self.score['red']} points")
@@ -90,16 +102,16 @@ class CodenameGame:
                 print(f"{team.title()} turn's started.")
 
                 clue, num_of_words = spymaster.give_clue()
-                print(f"{team.title()} spymaster's clue : {clue} for {num_of_words} cards")
+                print(f"{team.title()} spymaster's clue : {clue} for {num_of_words} card(s)")
                 guesses = field_operative.guess(clue= clue, num_of_words= num_of_words)
                 for guess in guesses:
                     color = self.evaluate_guess(guess, team)
                     if color != team: break
-
-                print(f"{team.title()} turn's ended.")
-                if not self.is_game_over: self.check_score() # This won't be the case if some player chose the assassin word
+                
+                self.check_score()
                 sleep(2)
-                if self.is_game_over or color != team: break
+                if self.is_game_over: break
+                else: print(f"{team.title()} turn's ended.\n")
         if render: self.close()
 
     def render(self):
@@ -126,12 +138,12 @@ class Spymaster(Player):
     def give_clue(self) -> tuple[str, int]:
         ## Note that we can't give a clue that is derived from a word on the board
         ## Use a stemmer to remove these kinds of words
-        playable_words_list = [k for k, v in self.gameboard.playable_cards.items() if v == 1]
+        playable_words_list = [k.lower() for k, v in self.gameboard.playable_cards.items() if v == 1]
         playable_words_roots_list = [self.__stemmer.stem(word) for word in playable_words_list]
-        allie_cards = [k for k, v in self.__key_card.items() if (v == self.team) and (k in playable_words_list)]
-        white_cards = [k for k, v in self.__key_card.items() if (v == 'white') and (k in playable_words_list)]
-        black_cards = [k for k, v in self.__key_card.items() if (v == 'black') and (k in playable_words_list)]
-        enemy_cards = [k for k, v in self.__key_card.items() if k not in allie_cards + white_cards + black_cards]
+        allie_cards = [k.lower() for k, v in self.__key_card.items() if (v == self.team) and (k.lower() in playable_words_list)]
+        white_cards = [k.lower() for k, v in self.__key_card.items() if (v == 'white') and (k.lower() in playable_words_list)]
+        black_cards = [k.lower() for k, v in self.__key_card.items() if (v == 'black') and (k.lower() in playable_words_list)]
+        enemy_cards = [k.lower() for k, _ in self.__key_card.items() if k.lower() not in allie_cards + white_cards + black_cards]
 
         allie_cards_embeddings = self.LM.encode(allie_cards, convert_to_numpy= True).astype("float32")
         enemy_cards_embeddings = self.LM.encode(enemy_cards, convert_to_numpy= True).astype("float32")
@@ -161,26 +173,27 @@ class Spymaster(Player):
             for idx in sorted_idx:
                 clue_word = self.id_to_word[indices[idx]]
                 clue_word_root = self.__stemmer.stem(clue_word)
-                if (clue_word_root not in playable_words_roots_list + allie_cards):
+                if (clue_word_root not in playable_words_roots_list + allie_cards + enemy_cards + white_cards + black_cards) and (clue_word not in playable_words_list + allie_cards + enemy_cards + white_cards + black_cards):
                     # Now we have a valid clue word
                     # Next step is to find how many words this clue is related to
                     clue_embedding = self.LM.encode([clue_word], convert_to_numpy= True).astype("float32")
-                    sim_scores, sim_indices = self.corpus_index.search(clue_embedding, k = len(self.game.get_words_list()))
-                    sim_scores = sim_scores[0]
-                    sim_indices = sim_indices[0]
-                    sorted_sim_idx = np.argsort(sim_scores)[::-1]
+                    faiss.normalize_L2(clue_embedding)
+                    score, words = self.game.board_index.search(clue_embedding, k = 10)
+                    scores = score[0]
+                    board_indices = words[0]
+                    sorted_board_idx = np.argsort(scores)[::-1]
                     num_of_words = 0
-                    for sidx in sorted_sim_idx:
-                        similar_word = self.id_to_word[sim_indices[sidx]]
-                        if similar_word in allie_cards:
+                    threshold = 0.3
+                    for j in sorted_board_idx:
+                        word = self.game.id_to_word_board[board_indices[j]]
+                        if word in allie_cards and scores[j] > threshold:
                             num_of_words += 1
-                        elif similar_word in enemy_cards + white_cards + black_cards:
+                        elif word in enemy_cards + white_cards + black_cards:
                             break
                     if num_of_words > 0:
                         return (clue_word, num_of_words)
         # If no clue is found, return a random word from the corpus with num_of_words = 1
-        random_clue = random.choice(self.game.get_words_list())
-        return (random_clue, 1)
+        return ('itman', 1)
 
     
 class FieldOperative(Player):
