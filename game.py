@@ -12,6 +12,17 @@ class GameBoard:
         self.word_list = game_vocab.values.flatten().tolist()
         self.playable_cards = dict(zip(self.word_list, [1] * 25))
         self.words_grid = game_vocab.to_numpy().reshape(5, 5)
+
+    def print_grid(self):
+        for row in self.words_grid:
+            display_row = []
+            for word in row:
+                if self.playable_cards.get(word, 0) == 1:
+                    display_row.append(f"{word:>10}")
+                else:
+                    display_row.append(f"{'---':>10}")
+            print(" | ".join(display_row))
+        print()
         
 class CodenameGame:
     def __init__(self):
@@ -81,9 +92,7 @@ class CodenameGame:
     def check_score(self):
         if self.score['red'] == self.__words_count['red']: print('RED TEM WON !!')
         elif self.score['blue'] == self.__words_count['blue']: print('BLUE TEM WON !!')
-        else:
-            self.print_score()
-            return
+        else: return
         self.is_game_over = True
         print(f"Blue team scored {self.score['blue']} points")
         print(f"Red team scored {self.score['red']} points")
@@ -100,7 +109,9 @@ class CodenameGame:
             if render: self.render()
             for team, (spymaster, field_operative) in take_turns:
                 print(f"{team.title()} turn's started.")
-
+                print("Current Board:")
+                self.game_board.print_grid()
+                self.print_score()
                 clue, num_of_words = spymaster.give_clue()
                 print(f"{team.title()} spymaster's clue : {clue} for {num_of_words} card(s)")
                 guesses = field_operative.guess(clue= clue, num_of_words= num_of_words)
