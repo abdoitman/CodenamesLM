@@ -93,7 +93,7 @@ class CodenameGame:
         print(f"Blue agents are : {', '.join([k for k, v in self.key_card.items() if v == 'blue'])}")
         print(f"Red agents are : {', '.join([k for k, v in self.key_card.items() if v == 'red'])}")
         print(f"Civilian words are : {', '.join([k for k, v in self.key_card.items() if v == 'white'])}")
-        print(f"Assassin word is : {', '.join([k for k, v in self.key_card.items() if v == 'black'])}")
+        print(f"Assassin word is : {', '.join([k for k, v in self.key_card.items() if v == 'black'])}\n")
         if self.starting_team == 'red' : take_turns = cycle([('red', red_team), ('blue', blue_team)])
         else: take_turns = cycle([('blue', blue_team), ('red', red_team)])
         while not self.is_game_over:
@@ -109,7 +109,7 @@ class CodenameGame:
                     if color != team: break
                 
                 self.check_score()
-                sleep(2)
+                sleep(3)
                 if self.is_game_over: break
                 else: print(f"{team.title()} turn's ended.\n")
         if render: self.close()
@@ -183,7 +183,7 @@ class Spymaster(Player):
                     board_indices = words[0]
                     sorted_board_idx = np.argsort(scores)[::-1]
                     num_of_words = 0
-                    threshold = 0.3
+                    threshold = 0.25
                     for j in sorted_board_idx:
                         word = self.game.id_to_word_board[board_indices[j]]
                         if word.lower() in allie_cards and scores[j] > threshold:
