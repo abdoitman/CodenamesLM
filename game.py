@@ -8,17 +8,26 @@ from nltk.stem import PorterStemmer
 from time import sleep
 
 class GameBoard:
-    def __init__(self, game_vocab: pd.DataFrame):
+    def __init__(self, game_vocab: pd.DataFrame, key_card: dict):
         self.word_list = game_vocab.values.flatten().tolist()
         self.playable_cards = dict(zip(self.word_list, [1] * 25))
         self.words_grid = game_vocab.to_numpy().reshape(5, 5)
+        self.key_card = key_card
 
     def print_grid(self):
+        color_map = {
+            'red': '\033[91m',    # Red
+            'blue': '\033[94m',   # Blue
+            'white': '\033[97m',  # White
+            'black': '\033[90m',  # Grey/Black
+        }
+        reset = '\033[0m'
         for row in self.words_grid:
             display_row = []
             for word in row:
                 if self.playable_cards.get(word, 0) == 1:
-                    display_row.append(f"{word:>10}")
+                    color = color_map.get(self.key_card.get(word, 'white'), reset)
+                    display_row.append(f"{color}{word:>10}{reset}")
                 else:
                     display_row.append(f"{'---':>10}")
             print(" | ".join(display_row))
@@ -29,10 +38,9 @@ class CodenameGame:
         self.score = {'red' : 0, 'blue': 0}
         self.__corpus = pd.read_csv('corpus.csv')
         self.__game_vocab = self.__corpus.sample(25)
-        self.game_board = GameBoard(self.__game_vocab)
         self.is_game_over = False
         self.is_turn_over = False
-        self.__words_list = self.game_board.word_list
+        self.__words_list = self.__game_vocab.values.flatten().tolist()
         random.shuffle(self.__words_list)
         assignments = [
             ((["black"] * 1 +
@@ -46,6 +54,7 @@ class CodenameGame:
         ]
         game_assignment, self.starting_team = random.choice(assignments)
         self.key_card = dict(zip(self.__words_list, game_assignment))
+        self.game_board = GameBoard(self.__game_vocab, self.key_card)
         self.__words_count = {
             'blue' : game_assignment.count('blue'),
             'red' : game_assignment.count('red')
@@ -67,24 +76,32 @@ class CodenameGame:
     def disable_card(self, word: str):
         self.game_board.playable_cards[word] = 0
 
-    def evaluate_guess(self, guess: str, team: str):
-        color = self.key_card[guess]
-        
-        if color == 'white': 
-            print(f"{team.title()} field operative guessed '{guess}' which is a civilian (white card)")
-        elif color == 'black':
-            self.is_game_over = True
-            print(f"{team.title()} field operative guessed '{guess}' which is the assassin (black card)")
-            print(f"TEAM {team.capitalize()} LOST!!")
-        elif color == team:
-            print(f"{team.title()} field operative guessed '{guess}' which is correct ({team} agent)")
-            self.set_score(team)
-        else:
-            print(f"{team.title()} field operative guessed '{guess}' which is not correct ({color} agent)")
-            self.set_score(color)
-        
-        self.disable_card(guess)
-        return color
+def evaluate_guess(self, guess: str, team: str):
+    color_map = {
+        'red': '\033[91m',
+        'blue': '\033[94m',
+        'white': '\033[97m',
+        'black': '\033[90m',
+    }
+    reset = '\033[0m'
+    color = self.key_card[guess]
+    colored_guess = f"{color_map.get(color, reset)}{guess}{reset}"
+
+    if color == 'white':
+        print(f"{team.title()} field operative guessed {colored_guess} which is a civilian")
+    elif color == 'black':
+        self.is_game_over = True
+        print(f"{team.title()} field operative guessed {colored_guess} which is the assassin")
+        print(f"TEAM {color_map.get(team, reset)}{team.capitalize()}{reset} LOST!!")
+    elif color == team:
+        print(f"{team.title()} field operative guessed {colored_guess} which is correct")
+        self.set_score(team)
+    else:
+        print(f"{team.title()} field operative guessed {colored_guess} which is not correct")
+        self.set_score(color)
+
+    self.disable_card(guess)
+    return color
 
     def print_score(self):
         print(f"Blue team : {self.score['blue']} points | Red team : {self.score['red']} points")
