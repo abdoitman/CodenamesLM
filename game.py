@@ -186,7 +186,7 @@ class Spymaster(Player):
                     threshold = 0.3
                     for j in sorted_board_idx:
                         word = self.game.id_to_word_board[board_indices[j]]
-                        if word in allie_cards and scores[j] > threshold:
+                        if word.lower() in allie_cards and scores[j] > threshold:
                             num_of_words += 1
                         elif word in enemy_cards + white_cards + black_cards:
                             break
