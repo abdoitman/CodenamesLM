@@ -5,6 +5,7 @@ import random
 import faiss
 from itertools import cycle
 from nltk.stem import PorterStemmer
+from time import sleep
 
 class GameBoard:
     def __init__(self, game_vocab: pd.DataFrame):
@@ -76,6 +77,11 @@ class CodenameGame:
         print(f"Red team scored {self.score['red']} points")
 
     def play(self, blue_team: tuple, red_team: tuple, render: bool = False):
+        print("Welcome to Codenames!")
+        print(f"Blue agents are : {', '.join([k for k, v in self.key_card.items() if v == 'blue'])}")
+        print(f"Red agents are : {', '.join([k for k, v in self.key_card.items() if v == 'red'])}")
+        print(f"Civilian words are : {', '.join([k for k, v in self.key_card.items() if v == 'white'])}")
+        print(f"Assassin word is : {', '.join([k for k, v in self.key_card.items() if v == 'black'])}")
         if self.starting_team == 'red' : take_turns = cycle([('red', red_team), ('blue', blue_team)])
         else: take_turns = cycle([('blue', blue_team), ('red', red_team)])
         while not self.is_game_over:
@@ -92,6 +98,8 @@ class CodenameGame:
 
                 print(f"{team.title()} turn's ended.")
                 if not self.is_game_over: self.check_score() # This won't be the case if some player chose the assassin word
+                sleep(2)
+                if self.is_game_over or color != team: break
         if render: self.close()
 
     def render(self):
@@ -101,12 +109,13 @@ class CodenameGame:
         pass
 
 class Player:
-    def __init__(self, game: CodenameGame, team: str, model, index: faiss.IndexFlatIP | faiss.IndexFlatL2):
+    def __init__(self, game: CodenameGame, team: str, model, index: faiss.IndexFlatIP | faiss.IndexFlatL2, id_to_word = None):
         self.team = team
         self.LM = model
         self.corpus_index = index
         self.game = game
         self.gameboard = game.game_board
+        self.id_to_word = id_to_word
 
 class Spymaster(Player):
     def __init__(self, **kwargs):
@@ -130,10 +139,48 @@ class Spymaster(Player):
         black_cards_embeddings = self.LM.encode(black_cards, convert_to_numpy= True).astype("float32")
 
         ### Here comes the lovely logic
+        if len(allie_cards) > 0:
+            mean_allie = np.mean(allie_cards_embeddings, axis=0, keepdims=True)
+            if len(enemy_cards) > 0:
+                mean_enemy = np.mean(enemy_cards_embeddings, axis=0, keepdims=True)
+                clue_vector = mean_allie - mean_enemy
+            else:
+                clue_vector = mean_allie
+            if len(white_cards) > 0:
+                mean_white = np.mean(white_cards_embeddings, axis=0, keepdims=True)
+                clue_vector = clue_vector - 0.5 * mean_white
+            if len(black_cards) > 0:
+                mean_black = np.mean(black_cards_embeddings, axis=0, keepdims=True)
+                clue_vector = clue_vector - mean_black
+            faiss.normalize_L2(clue_vector)
+            score, indices = self.corpus_index.search(clue_vector, k = 20)
+            scores = score[0]
+            indices = indices[0]
+            sorted_idx = np.argsort(scores)[::-1]
 
-        clue = ''
-        num_of_words = 0
-        return (clue, num_of_words)
+            for idx in sorted_idx:
+                clue_word = self.id_to_word[indices[idx]]
+                clue_word_root = self.__stemmer.stem(clue_word)
+                if (clue_word_root not in playable_words_roots_list + allie_cards):
+                    # Now we have a valid clue word
+                    # Next step is to find how many words this clue is related to
+                    clue_embedding = self.LM.encode([clue_word], convert_to_numpy= True).astype("float32")
+                    sim_scores, sim_indices = self.corpus_index.search(clue_embedding, k = len(self.game.get_words_list()))
+                    sim_scores = sim_scores[0]
+                    sim_indices = sim_indices[0]
+                    sorted_sim_idx = np.argsort(sim_scores)[::-1]
+                    num_of_words = 0
+                    for sidx in sorted_sim_idx:
+                        similar_word = self.id_to_word[sim_indices[sidx]]
+                        if similar_word in allie_cards:
+                            num_of_words += 1
+                        elif similar_word in enemy_cards + white_cards + black_cards:
+                            break
+                    if num_of_words > 0:
+                        return (clue_word, num_of_words)
+        # If no clue is found, return a random word from the corpus with num_of_words = 1
+        random_clue = random.choice(self.game.get_words_list())
+        return (random_clue, 1)
 
     
 class FieldOperative(Player):
@@ -147,6 +194,8 @@ class FieldOperative(Player):
         self.id_to_word = {i: w for i, w in enumerate(self.cards)}
     
     def guess(self, clue: str, num_of_words: int) -> list:
+        clue = self.LM.encode([clue], convert_to_numpy= True).astype("float32")
+        faiss.normalize_L2(clue)
         score, words = self.cards_index.search(clue, k = 10)
         playable_words_list = [k for k, v in self.gameboard.playable_cards.items() if v == 1]
         scores = score[0]
