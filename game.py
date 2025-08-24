@@ -76,32 +76,32 @@ class CodenameGame:
     def disable_card(self, word: str):
         self.game_board.playable_cards[word] = 0
 
-def evaluate_guess(self, guess: str, team: str):
-    color_map = {
-        'red': '\033[91m',
-        'blue': '\033[94m',
-        'white': '\033[97m',
-        'black': '\033[90m',
-    }
-    reset = '\033[0m'
-    color = self.key_card[guess]
-    colored_guess = f"{color_map.get(color, reset)}{guess}{reset}"
+    def evaluate_guess(self, guess: str, team: str):
+        color_map = {
+            'red': '\033[91m',
+            'blue': '\033[94m',
+            'white': '\033[97m',
+            'black': '\033[90m',
+        }
+        reset = '\033[0m'
+        color = self.key_card[guess]
+        colored_guess = f"{color_map.get(color, reset)}{guess}{reset}"
 
-    if color == 'white':
-        print(f"{team.title()} field operative guessed {colored_guess} which is a civilian")
-    elif color == 'black':
-        self.is_game_over = True
-        print(f"{team.title()} field operative guessed {colored_guess} which is the assassin")
-        print(f"TEAM {color_map.get(team, reset)}{team.capitalize()}{reset} LOST!!")
-    elif color == team:
-        print(f"{team.title()} field operative guessed {colored_guess} which is correct")
-        self.set_score(team)
-    else:
-        print(f"{team.title()} field operative guessed {colored_guess} which is not correct")
-        self.set_score(color)
+        if color == 'white':
+            print(f"{team.title()} field operative guessed {colored_guess} which is a civilian")
+        elif color == 'black':
+            self.is_game_over = True
+            print(f"{team.title()} field operative guessed {colored_guess} which is the assassin")
+            print(f"TEAM {color_map.get(team, reset)}{team.capitalize()}{reset} LOST!!")
+        elif color == team:
+            print(f"{team.title()} field operative guessed {colored_guess} which is correct")
+            self.set_score(team)
+        else:
+            print(f"{team.title()} field operative guessed {colored_guess} which is not correct")
+            self.set_score(color)
 
-    self.disable_card(guess)
-    return color
+        self.disable_card(guess)
+        return color
 
     def print_score(self):
         print(f"Blue team : {self.score['blue']} points | Red team : {self.score['red']} points")
