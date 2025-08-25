@@ -28,9 +28,9 @@ corpus = list(final_vocab)
 model = SentenceTransformer("all-MiniLM-L6-v2")
 embeddings = model.encode(corpus, convert_to_numpy=True).astype("float32")
 
-
 dim = embeddings.shape[1]
 index = faiss.IndexFlatIP(dim) #Cosine similarity
+faiss.normalize_L2(embeddings)
 index.add(embeddings)
 
 print(f"Stored {index.ntotal} word embeddings.")
