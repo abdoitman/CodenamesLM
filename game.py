@@ -6,6 +6,17 @@ import faiss
 from itertools import cycle
 from nltk.stem import PorterStemmer
 from time import sleep
+from dataclasses import dataclass
+
+@dataclass
+class WordsCombination:
+    word_ids: list
+    color: int # 0 for ally, 1 for white, 2 for enemy, 3 for black 
+    score: float
+
+    def __len__(self):
+            return len(self.word_ids)
+    
 
 class GameBoard:
     def __init__(self, game_vocab: pd.DataFrame, key_card: dict):
@@ -173,6 +184,12 @@ class Player:
         self.game = game
         self.gameboard = game.game_board
         self.id_to_word = id_to_word
+        self.cards = self.game.get_words_list()
+        cards_embeddings = self.LM.encode(self.cards, convert_to_numpy=True).astype("float32")
+        dim = cards_embeddings.shape[1]
+        self.cards_index = faiss.IndexFlatIP(dim)
+        self.cards_index.add(cards_embeddings)
+        self.game_cards_id_to_word = {i: w for i, w in enumerate(self.cards)}
 
 class Spymaster(Player):
     def __init__(self, **kwargs):
@@ -180,29 +197,48 @@ class Spymaster(Player):
         self.__key_card = self.game.key_card
         self.__stemmer = PorterStemmer()
 
+    def _choose_the_best_subset(self, cards: list, embeddings: list, playable_words_list: list) -> str | list:
+        ally_cards, white_cards, black_cards, enemy_cards = cards
+        ally_cards_embeddings, white_cards_embeddings, black_cards_embeddings, enemy_cards_embeddings = embeddings
+        first_level_threshold = 0.5,
+        second_level_threshold = 0.35
+        third_level_threshold = 0.25
+        subsets = []
+        if len(ally_cards_embeddings) > 0:
+            for idx, aly_embedding in enumerate(ally_cards_embeddings):
+                score, indices = self.cards_index.search(np.array([aly_embedding]), k = 25)
+                scores = score[0]
+                indices = indices[0]
+                mask = scores > first_level_threshold
+                filtered_scores = scores[mask]
+                filtered_indices = indices[mask]
+                sorted_idx = np.argsort(filtered_scores)[::-1]
+                for i in sorted_idx:
+                    
+
     def give_clue(self) -> tuple[str, int]:
         ## Note that we can't give a clue that is derived from a word on the board
         ## Use a stemmer to remove these kinds of words
         playable_words_list = [k.lower() for k, v in self.gameboard.playable_cards.items() if v == 1]
         playable_words_roots_list = [self.__stemmer.stem(word) for word in playable_words_list]
-        allie_cards = [k.lower() for k, v in self.__key_card.items() if (v == self.team) and (k.lower() in playable_words_list)]
+        ally_cards = [k.lower() for k, v in self.__key_card.items() if (v == self.team) and (k.lower() in playable_words_list)]
         white_cards = [k.lower() for k, v in self.__key_card.items() if (v == 'white') and (k.lower() in playable_words_list)]
         black_cards = [k.lower() for k, v in self.__key_card.items() if (v == 'black') and (k.lower() in playable_words_list)]
-        enemy_cards = [k.lower() for k, _ in self.__key_card.items() if k.lower() not in allie_cards + white_cards + black_cards]
+        enemy_cards = [k.lower() for k, _ in self.__key_card.items() if k.lower() not in ally_cards + white_cards + black_cards]
 
-        allie_cards_embeddings = self.LM.encode(allie_cards, convert_to_numpy= True).astype("float32")
+        ally_cards_embeddings = self.LM.encode(ally_cards, convert_to_numpy= True).astype("float32")
         enemy_cards_embeddings = self.LM.encode(enemy_cards, convert_to_numpy= True).astype("float32")
         white_cards_embeddings = self.LM.encode(white_cards, convert_to_numpy= True).astype("float32")
         black_cards_embeddings = self.LM.encode(black_cards, convert_to_numpy= True).astype("float32")
 
         ### Here comes the lovely logic
-        if len(allie_cards) > 0:
-            mean_allie = np.mean(allie_cards_embeddings, axis=0, keepdims=True)
+        if len(ally_cards) > 0:
+            mean_ally = np.mean(ally_cards_embeddings, axis=0, keepdims=True)
             if len(enemy_cards) > 0:
                 mean_enemy = np.mean(enemy_cards_embeddings, axis=0, keepdims=True)
-                clue_vector = mean_allie - mean_enemy
+                clue_vector = mean_ally - mean_enemy
             else:
-                clue_vector = mean_allie
+                clue_vector = mean_ally
             if len(white_cards) > 0:
                 mean_white = np.mean(white_cards_embeddings, axis=0, keepdims=True)
                 clue_vector = clue_vector - 0.5 * mean_white
@@ -218,7 +254,7 @@ class Spymaster(Player):
             for idx in sorted_idx:
                 clue_word = self.id_to_word[indices[idx]]
                 clue_word_root = self.__stemmer.stem(clue_word)
-                if (clue_word_root not in playable_words_roots_list + allie_cards + enemy_cards + white_cards + black_cards) and (clue_word not in playable_words_list + allie_cards + enemy_cards + white_cards + black_cards):
+                if (clue_word_root not in playable_words_roots_list + ally_cards + enemy_cards + white_cards + black_cards) and (clue_word not in playable_words_list + ally_cards + enemy_cards + white_cards + black_cards):
                     # Now we have a valid clue word
                     # Next step is to find how many words this clue is related to
                     clue_embedding = self.LM.encode([clue_word], convert_to_numpy= True).astype("float32")
@@ -231,7 +267,7 @@ class Spymaster(Player):
                     threshold = 0.25
                     for j in sorted_board_idx:
                         word = self.game.id_to_word_board[board_indices[j]]
-                        if word.lower() in allie_cards and scores[j] > threshold:
+                        if word.lower() in ally_cards and scores[j] > threshold:
                             num_of_words += 1
                         elif word in enemy_cards + white_cards + black_cards:
                             break
@@ -244,13 +280,8 @@ class Spymaster(Player):
 class FieldOperative(Player):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.cards = self.game.get_words_list()
-        cards_embeddings = self.LM.encode(self.cards, convert_to_numpy=True).astype("float32")
-        dim = cards_embeddings.shape[1]
-        self.cards_index = faiss.IndexFlatIP(dim)
-        self.cards_index.add(cards_embeddings)
-        self.id_to_word = {i: w for i, w in enumerate(self.cards)}
-    
+
+
     def guess(self, clue: str, num_of_words: int) -> list:
         clue = self.LM.encode([clue], convert_to_numpy= True).astype("float32")
         faiss.normalize_L2(clue)
@@ -262,7 +293,7 @@ class FieldOperative(Player):
 
         guesses = []
         for idx in sorted_idx:
-            word = self.id_to_word[indices[idx]]
+            word = self.game_cards_id_to_word[indices[idx]]
             if word in playable_words_list:
                 guesses.append(word)
             if len(guesses) == num_of_words:
