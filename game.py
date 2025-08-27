@@ -7,6 +7,7 @@ from itertools import cycle
 from nltk.stem import PorterStemmer
 from time import sleep
 from dataclasses import dataclass
+import itertools
 
 @dataclass
 class WordsCombination:
@@ -197,24 +198,36 @@ class Spymaster(Player):
         self.__key_card = self.game.key_card
         self.__stemmer = PorterStemmer()
 
-    def _choose_the_best_subset(self, cards: list, embeddings: list, playable_words_list: list) -> str | list:
-        ally_cards, white_cards, black_cards, enemy_cards = cards
-        ally_cards_embeddings, white_cards_embeddings, black_cards_embeddings, enemy_cards_embeddings = embeddings
-        first_level_threshold = 0.5,
-        second_level_threshold = 0.35
-        third_level_threshold = 0.25
-        subsets = []
-        if len(ally_cards_embeddings) > 0:
-            for idx, aly_embedding in enumerate(ally_cards_embeddings):
-                score, indices = self.cards_index.search(np.array([aly_embedding]), k = 25)
-                scores = score[0]
-                indices = indices[0]
-                mask = scores > first_level_threshold
-                filtered_scores = scores[mask]
-                filtered_indices = indices[mask]
-                sorted_idx = np.argsort(filtered_scores)[::-1]
-                for i in sorted_idx:
-                    
+    @staticmethod
+    def _choose_best_ally_subset(ally_embeddings, enemy_embeddings, black_embeddings, subset_size= 5):
+        """
+        Finds the best subset of ally cards (of any size) whose embeddings are closest to each other
+        and farthest from enemy and black card embeddings.
+        Returns the indices of the best subset in ally_embeddings.
+        """
+        best_score = -np.inf
+        best_subset = None
+
+        n = len(ally_embeddings)
+        for subset_indices in itertools.combinations(range(n), subset_size):
+            subset = [ally_embeddings[i] for i in subset_indices]
+            sims = []
+            for i in range(len(subset)):
+                for j in range(i+1, len(subset)):
+                    sims.append(np.dot(subset[i], subset[j]) / (np.linalg.norm(subset[i]) * np.linalg.norm(subset[j])))
+            if sims:
+                within_sim = np.mean(sims)
+            else:
+                within_sim = 0
+            # Average similarity to enemy and black embeddings
+            enemy_sim = np.mean([np.dot(card, e) / (np.linalg.norm(card) * np.linalg.norm(e)) for card in subset for e in enemy_embeddings]) if len(enemy_embeddings) > 0 else 0
+            black_sim = np.mean([np.dot(card, b) / (np.linalg.norm(card) * np.linalg.norm(b)) for card in subset for b in black_embeddings]) if len(black_embeddings) > 0 else 0
+            score = within_sim - (enemy_sim + black_sim)
+            if score > best_score:
+                best_score = score
+                best_subset = subset_indices
+        return best_subset
+                        
 
     def give_clue(self) -> tuple[str, int]:
         ## Note that we can't give a clue that is derived from a word on the board
@@ -230,6 +243,11 @@ class Spymaster(Player):
         enemy_cards_embeddings = self.LM.encode(enemy_cards, convert_to_numpy= True).astype("float32")
         white_cards_embeddings = self.LM.encode(white_cards, convert_to_numpy= True).astype("float32")
         black_cards_embeddings = self.LM.encode(black_cards, convert_to_numpy= True).astype("float32")
+
+        cards = [ally_cards, white_cards, enemy_cards, black_cards]
+        embeddings = [ally_cards_embeddings, white_cards_embeddings, enemy_cards_embeddings, black_cards_embeddings]
+
+        self._choose_best_ally_subset(cards, embeddings, playable_words_list)
 
         ### Here comes the lovely logic
         if len(ally_cards) > 0:
