@@ -247,7 +247,7 @@ class Spymaster(Player):
         cards = [ally_cards, white_cards, enemy_cards, black_cards]
         embeddings = [ally_cards_embeddings, white_cards_embeddings, enemy_cards_embeddings, black_cards_embeddings]
 
-        self._choose_best_ally_subset(cards, embeddings, playable_words_list)
+        # self._choose_best_ally_subset(cards, embeddings, playable_words_list)
 
         ### Here comes the lovely logic
         if len(ally_cards) > 0:
